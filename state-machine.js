@@ -4,7 +4,7 @@
 
     //---------------------------------------------------------------------------
 
-    VERSION: "2.2.0",
+    VERSION: "2.2.1",
 
     //---------------------------------------------------------------------------
 
@@ -37,13 +37,15 @@
       var add = function(e) {
         var from = (e.from instanceof Array) ? e.from : (e.from ? [e.from] : [StateMachine.WILDCARD]); // allow 'wildcard' transition if 'from' is not specified
         map[e.name] = map[e.name] || {};
-        for (var n = 0 ; n < from.length ; n++)
-          map[e.name][from[n]] = e.to || from[n]; // allow no-op transition if 'to' is not specified
+        for (var n = 0 ; n < from.length ; n++) {
+		  map[e.name][from[n]] = map[e.name][from[n]] || {};
+		  map[e.name][from[n]][e.to || from[n]] = e.condition || function() { return true; };
+		}
       };
 
       if (initial) {
         initial.event = initial.event || 'startup';
-        add({ name: initial.event, from: 'none', to: initial.state });
+        add({ name: initial.event, from: 'none', to: initial.state, condition: function() { return true; } });
       }
 
       for(var n = 0 ; n < events.length ; n++)
@@ -61,7 +63,17 @@
 
       fsm.current = 'none';
       fsm.is      = function(state) { return this.current == state; };
-      fsm.can     = function(event) { return !this.transition && (map[event].hasOwnProperty(this.current) || map[event].hasOwnProperty(StateMachine.WILDCARD)); }
+      fsm.can     = function(event) { 
+		var from = map[event].hasOwnProperty(this.current) ? this.current : map[event].hasOwnProperty(StateMachine.WILDCARD) ? StateMachine.WILDCARD : null;
+		var to = map[event][from];
+		for(var name in to) {
+			if (to.hasOwnProperty(name) && to[name]()) {
+				to = name;
+				break;
+			}
+		}
+		return !this.transition && (typeof to == 'string');
+	  }
       fsm.cannot  = function(event) { return !this.can(event); };
       fsm.error   = cfg.error || function(name, from, to, args, error, msg, e) { throw e || msg; }; // default behavior when something unexpected happens is to throw an exception, but caller can override this behavior if desired (see github issue #3 and #17)
 
@@ -97,6 +109,17 @@
 
         var from  = this.current;
         var to    = map[from] || map[StateMachine.WILDCARD] || from;
+		var states = [];
+		if(typeof to != 'string') {
+			for(var state in to) {
+				if (to.hasOwnProperty(state) && to[state]()) {
+					states.push(state);					
+				}
+			}
+			if(states.length !== 1)
+				return this.error(name, from, 'multiple states', args, StateMachine.Error.INVALID_TRANSITION, "event " + name + " has multiple transitions in current state " + this.current);
+			to = states[0];
+		}		
         var args  = Array.prototype.slice.call(arguments); // turn arguments into pure array
 
         if (this.transition)
@@ -156,4 +179,3 @@
   }
 
 }(this));
-
