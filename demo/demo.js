@@ -6,6 +6,7 @@ Demo = function() {
       warn   = document.getElementById('warn'),
       calm   = document.getElementById('calm'),
       clear  = document.getElementById('clear'),
+	  highAlert  = document.getElementById('highAlert'),
       count  = 0;
 
   var log = function(msg, separate) {
@@ -22,7 +23,8 @@ Demo = function() {
 
     events: [
       { name: 'start', from: 'none',   to: 'green'  },
-      { name: 'warn',  from: 'green',  to: 'yellow' },
+      { name: 'warn',  from: 'green',  to: 'yellow',   condition: function() { return !highAlert.checked; } },
+	  { name: 'warn',  from: 'green',  to: 'red',      condition: function() { return highAlert.checked;  } },
       { name: 'panic', from: 'green',  to: 'red'    },
       { name: 'panic', from: 'yellow', to: 'red'    },
       { name: 'calm',  from: 'red',    to: 'yellow' },
@@ -70,6 +72,10 @@ Demo = function() {
   };
 
   var pending = function(to, n) { log("PENDING STATE: " + to + " in ..." + n); };
+  
+  fsm.highAlert = function(e) {
+	log("HIGH ALERT!", true);
+  };
 
   fsm.start();
   return fsm;
